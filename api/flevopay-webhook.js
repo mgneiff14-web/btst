@@ -3,33 +3,12 @@ const crypto = require('crypto');
 const FLEVOPAY_QUERY_API = 'https://app.flevopay.com.br/api/v1/query';
 const UTMIFY_API = 'https://api.utmify.com.br/api-credentials/orders';
 const TIKTOK_EVENTS_API = 'https://business-api.tiktok.com/open_api/v1.3/event/track/';
-const XTRACKY_API = 'https://api.xtracky.com/api/integrations/api';
+// Integração nativa: a xTracky tem parser próprio pro formato de webhook da FlevoPay,
+// então repassamos o payload cru (exatamente como a FlevoPay mandou pra gente), sem reformatar.
+const XTRACKY_NATIVE_API = 'https://api.xtracky.com/api/integrations/flevo';
 
 function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
-}
-
-// xTracky espera o telefone em E.164 com "+" (ex: "+5511999999999").
-function toE164BR(value) {
-  const digits = onlyDigits(value);
-  if (!digits) return undefined;
-  return digits.startsWith('55') ? `+${digits}` : `+55${digits}`;
-}
-
-// xTracky não documenta um status "chargeback" separado; tratamos como reembolso.
-function mapXtrackyStatus(rawStatus) {
-  switch (rawStatus) {
-    case 'approved':
-      return 'paid';
-    case 'failed':
-    case 'refused':
-      return 'failed';
-    case 'refunded':
-    case 'chargeback':
-      return 'refunded';
-    default:
-      return null;
-  }
 }
 
 function sha256(value) {
@@ -119,18 +98,18 @@ async function pushTikTokPurchase({ transactionId, amountReais, customer, pixelI
   }
 }
 
-async function pushXtracky(payload) {
+async function relayToXtrackyNative(rawBody) {
   try {
-    console.log('xTracky update payload', JSON.stringify(payload));
-    const r = await fetch(XTRACKY_API, {
+    console.log('xTracky native relay payload', JSON.stringify(rawBody));
+    const r = await fetch(XTRACKY_NATIVE_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(rawBody),
     });
     const bodyText = await r.text().catch(() => '');
-    console.log('xTracky update response', r.status, bodyText);
+    console.log('xTracky native relay response', r.status, bodyText);
   } catch (err) {
-    console.error('xTracky update error', err);
+    console.error('xTracky native relay error', err);
   }
 }
 
@@ -229,22 +208,8 @@ module.exports = async (req, res) => {
     }
   }
 
-  const xtrackyLeadId = tracking.sck || null;
-  const xtrackyStatus = mapXtrackyStatus(status);
-  if (xtrackyLeadId && xtrackyStatus) {
-    await pushXtracky({
-      orderId: String(transactionId),
-      amount: amountCents,
-      status: xtrackyStatus,
-      utm_source: xtrackyLeadId,
-      platform: 'FlevoPay',
-      leadName: customer.name || 'Cliente',
-      leadEmail: customer.email,
-      leadPhone: toE164BR(customer.phone),
-      leadDocument: onlyDigits(customer.document) || undefined,
-      currency: 'BRL',
-    });
-  }
+  // Integração nativa: repassa o payload exatamente como a FlevoPay mandou, sem reformatar.
+  await relayToXtrackyNative(incoming);
 
   res.status(200).json({ received: true });
 };

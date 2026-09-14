@@ -1,31 +1,8 @@
 const FLEVOPAY_API = 'https://app.flevopay.com.br/api/v1/transaction';
 const UTMIFY_API = 'https://api.utmify.com.br/api-credentials/orders';
-const XTRACKY_API = 'https://api.xtracky.com/api/integrations/api';
 
 function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
-}
-
-// xTracky espera o telefone em E.164 com "+" (ex: "+5511999999999").
-function toE164BR(value) {
-  const digits = onlyDigits(value);
-  if (!digits) return undefined;
-  return digits.startsWith('55') ? `+${digits}` : `+55${digits}`;
-}
-
-async function pushXtracky(payload) {
-  try {
-    console.log('xTracky push payload', JSON.stringify(payload));
-    const r = await fetch(XTRACKY_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const bodyText = await r.text().catch(() => '');
-    console.log('xTracky push response', r.status, bodyText);
-  } catch (err) {
-    console.error('xTracky push error', err);
-  }
 }
 
 function utcTimestamp(date) {
@@ -171,20 +148,8 @@ module.exports = async (req, res) => {
     },
   });
 
-  if (xtrackyLeadId) {
-    await pushXtracky({
-      orderId: String(data.transaction_id),
-      amount: amountCents,
-      status: 'waiting_payment',
-      utm_source: xtrackyLeadId,
-      platform: 'FlevoPay',
-      leadName: payer.name || 'Cliente',
-      leadEmail: payer.email,
-      leadPhone: toE164BR(payer.phone),
-      leadDocument: onlyDigits(payer.cpf) || undefined,
-      currency: 'BRL',
-    });
-  }
+  // Nada a fazer com a xTracky aqui: com a integração nativa (Flevo), quem repassa
+  // pra ela é o api/flevopay-webhook.js, direto do payload que a FlevoPay envia.
 
   res.status(200).json({
     invoiceId: data.transaction_id,
