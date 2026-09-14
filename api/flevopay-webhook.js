@@ -14,6 +14,13 @@ function extractXtrackyLeadId(reference) {
   return m ? m[1] : null;
 }
 
+// xTracky espera o telefone em E.164 com "+" (ex: "+5511999999999").
+function toE164BR(value) {
+  const digits = onlyDigits(value);
+  if (!digits) return undefined;
+  return digits.startsWith('55') ? `+${digits}` : `+55${digits}`;
+}
+
 // xTracky não documenta um status "chargeback" separado; tratamos como reembolso.
 function mapXtrackyStatus(rawStatus) {
   switch (rawStatus) {
@@ -231,7 +238,7 @@ module.exports = async (req, res) => {
       platform: 'FlevoPay',
       leadName: customer.name || 'Cliente',
       leadEmail: customer.email,
-      leadPhone: onlyDigits(customer.phone) || undefined,
+      leadPhone: toE164BR(customer.phone),
       leadDocument: onlyDigits(customer.document) || undefined,
       currency: 'BRL',
     });

@@ -6,6 +6,13 @@ function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
+// xTracky espera o telefone em E.164 com "+" (ex: "+5511999999999").
+function toE164BR(value) {
+  const digits = onlyDigits(value);
+  if (!digits) return undefined;
+  return digits.startsWith('55') ? `+${digits}` : `+55${digits}`;
+}
+
 // O leadId da xTracky viaja embutido no reference/externalId (formato "...;xlid:<id>"),
 // já que não temos banco de dados pra correlacionar depois no webhook.
 function extractXtrackyLeadId(reference) {
@@ -175,7 +182,7 @@ module.exports = async (req, res) => {
       platform: 'FlevoPay',
       leadName: payer.name || 'Cliente',
       leadEmail: payer.email,
-      leadPhone: onlyDigits(payer.phone) || undefined,
+      leadPhone: toE164BR(payer.phone),
       leadDocument: onlyDigits(payer.cpf) || undefined,
       currency: 'BRL',
     });
