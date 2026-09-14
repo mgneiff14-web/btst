@@ -13,13 +13,6 @@ function toE164BR(value) {
   return digits.startsWith('55') ? `+${digits}` : `+55${digits}`;
 }
 
-// O leadId da xTracky viaja embutido no reference/externalId (formato "...;xlid:<id>"),
-// já que não temos banco de dados pra correlacionar depois no webhook.
-function extractXtrackyLeadId(reference) {
-  const m = /;xlid:([^;]+)/.exec(String(reference || ''));
-  return m ? m[1] : null;
-}
-
 async function pushXtracky(payload) {
   try {
     const r = await fetch(XTRACKY_API, {
@@ -69,6 +62,7 @@ module.exports = async (req, res) => {
   const item = Array.isArray(items) && items[0] ? items[0] : {};
   const shipping = tracking && tracking.shipping;
   const utm = (tracking && tracking.utm) || {};
+  const xtrackyLeadId = (tracking && tracking.xtrackyLeadId) || null;
 
   if (!amountCents || !externalId || !payer || !payer.cpf || !payer.email || !payer.phone) {
     res.status(400).json({ message: 'Dados obrigatórios ausentes.' });
@@ -111,6 +105,9 @@ module.exports = async (req, res) => {
     utm_campaign: utm.utm_campaign || undefined,
     utm_content: utm.utm_content || undefined,
     utm_term: utm.utm_term || undefined,
+    // Reaproveitamos "sck" (não usado por outra coisa) pra carregar o LeadId da xTracky
+    // de volta pro webhook, sem precisar de banco de dados.
+    sck: xtrackyLeadId || undefined,
   };
 
   let data;
@@ -172,7 +169,6 @@ module.exports = async (req, res) => {
     },
   });
 
-  const xtrackyLeadId = extractXtrackyLeadId(externalId);
   if (xtrackyLeadId) {
     await pushXtracky({
       orderId: String(data.transaction_id),

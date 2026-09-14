@@ -9,11 +9,6 @@ function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
-function extractXtrackyLeadId(reference) {
-  const m = /;xlid:([^;]+)/.exec(String(reference || ''));
-  return m ? m[1] : null;
-}
-
 // xTracky espera o telefone em E.164 com "+" (ex: "+5511999999999").
 function toE164BR(value) {
   const digits = onlyDigits(value);
@@ -226,8 +221,7 @@ module.exports = async (req, res) => {
     });
   }
 
-  const reference = (verified && verified.external_id) || incoming.external_id || incoming.store_reference;
-  const xtrackyLeadId = extractXtrackyLeadId(reference);
+  const xtrackyLeadId = tracking.sck || null;
   const xtrackyStatus = mapXtrackyStatus(status);
   if (xtrackyLeadId && xtrackyStatus) {
     await pushXtracky({
