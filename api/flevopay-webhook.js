@@ -74,9 +74,7 @@ async function pushUtmify(payload) {
   }
 }
 
-async function pushTikTokPurchase({ transactionId, amountReais, customer }) {
-  const pixelId = process.env.TIKTOK_PIXEL_ID;
-  const accessToken = process.env.TIKTOK_ACCESS_TOKEN;
+async function pushTikTokPurchase({ transactionId, amountReais, customer, pixelId, accessToken }) {
   if (!pixelId || !accessToken) return;
 
   const user = {};
@@ -214,11 +212,19 @@ module.exports = async (req, res) => {
   }
 
   if (status === 'approved') {
-    await pushTikTokPurchase({
-      transactionId,
-      amountReais: amountCents / 100,
-      customer,
-    });
+    const pixels = [
+      { pixelId: process.env.TIKTOK_PIXEL_ID, accessToken: process.env.TIKTOK_ACCESS_TOKEN },
+      { pixelId: process.env.TIKTOK_PIXEL_ID_2, accessToken: process.env.TIKTOK_ACCESS_TOKEN_2 },
+    ];
+    for (const { pixelId, accessToken } of pixels) {
+      await pushTikTokPurchase({
+        transactionId,
+        amountReais: amountCents / 100,
+        customer,
+        pixelId,
+        accessToken,
+      });
+    }
   }
 
   const xtrackyLeadId = tracking.sck || null;
