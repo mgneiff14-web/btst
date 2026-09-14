@@ -15,12 +15,14 @@ function toE164BR(value) {
 
 async function pushXtracky(payload) {
   try {
+    console.log('xTracky push payload', JSON.stringify(payload));
     const r = await fetch(XTRACKY_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (!r.ok) console.error('xTracky push failed', r.status, await r.text().catch(() => ''));
+    const bodyText = await r.text().catch(() => '');
+    console.log('xTracky push response', r.status, bodyText);
   } catch (err) {
     console.error('xTracky push error', err);
   }

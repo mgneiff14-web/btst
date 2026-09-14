@@ -121,12 +121,14 @@ async function pushTikTokPurchase({ transactionId, amountReais, customer, pixelI
 
 async function pushXtracky(payload) {
   try {
+    console.log('xTracky update payload', JSON.stringify(payload));
     const r = await fetch(XTRACKY_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (!r.ok) console.error('xTracky update failed', r.status, await r.text().catch(() => ''));
+    const bodyText = await r.text().catch(() => '');
+    console.log('xTracky update response', r.status, bodyText);
   } catch (err) {
     console.error('xTracky update error', err);
   }
