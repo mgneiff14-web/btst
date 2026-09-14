@@ -3,9 +3,31 @@ const crypto = require('crypto');
 const FLEVOPAY_QUERY_API = 'https://app.flevopay.com.br/api/v1/query';
 const UTMIFY_API = 'https://api.utmify.com.br/api-credentials/orders';
 const TIKTOK_EVENTS_API = 'https://business-api.tiktok.com/open_api/v1.3/event/track/';
+const XTRACKY_API = 'https://api.xtracky.com/api/integrations/api';
 
 function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
+}
+
+function extractXtrackyLeadId(reference) {
+  const m = /;xlid:([^;]+)/.exec(String(reference || ''));
+  return m ? m[1] : null;
+}
+
+// xTracky não documenta um status "chargeback" separado; tratamos como reembolso.
+function mapXtrackyStatus(rawStatus) {
+  switch (rawStatus) {
+    case 'approved':
+      return 'paid';
+    case 'failed':
+    case 'refused':
+      return 'failed';
+    case 'refunded':
+    case 'chargeback':
+      return 'refunded';
+    default:
+      return null;
+  }
 }
 
 function sha256(value) {
@@ -97,6 +119,19 @@ async function pushTikTokPurchase({ transactionId, amountReais, customer }) {
   }
 }
 
+async function pushXtracky(payload) {
+  try {
+    const r = await fetch(XTRACKY_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) console.error('xTracky update failed', r.status, await r.text().catch(() => ''));
+  } catch (err) {
+    console.error('xTracky update error', err);
+  }
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).end();
@@ -181,6 +216,24 @@ module.exports = async (req, res) => {
       transactionId,
       amountReais: amountCents / 100,
       customer,
+    });
+  }
+
+  const reference = (verified && verified.external_id) || incoming.external_id || incoming.store_reference;
+  const xtrackyLeadId = extractXtrackyLeadId(reference);
+  const xtrackyStatus = mapXtrackyStatus(status);
+  if (xtrackyLeadId && xtrackyStatus) {
+    await pushXtracky({
+      orderId: String(transactionId),
+      amount: amountCents,
+      status: xtrackyStatus,
+      utm_source: xtrackyLeadId,
+      platform: 'FlevoPay',
+      leadName: customer.name || 'Cliente',
+      leadEmail: customer.email,
+      leadPhone: onlyDigits(customer.phone) || undefined,
+      leadDocument: onlyDigits(customer.document) || undefined,
+      currency: 'BRL',
     });
   }
 

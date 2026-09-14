@@ -1,8 +1,29 @@
 const FLEVOPAY_API = 'https://app.flevopay.com.br/api/v1/transaction';
 const UTMIFY_API = 'https://api.utmify.com.br/api-credentials/orders';
+const XTRACKY_API = 'https://api.xtracky.com/api/integrations/api';
 
 function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
+}
+
+// O leadId da xTracky viaja embutido no reference/externalId (formato "...;xlid:<id>"),
+// já que não temos banco de dados pra correlacionar depois no webhook.
+function extractXtrackyLeadId(reference) {
+  const m = /;xlid:([^;]+)/.exec(String(reference || ''));
+  return m ? m[1] : null;
+}
+
+async function pushXtracky(payload) {
+  try {
+    const r = await fetch(XTRACKY_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) console.error('xTracky push failed', r.status, await r.text().catch(() => ''));
+  } catch (err) {
+    console.error('xTracky push error', err);
+  }
 }
 
 function utcTimestamp(date) {
@@ -143,6 +164,22 @@ module.exports = async (req, res) => {
       userCommissionInCents: amountCents,
     },
   });
+
+  const xtrackyLeadId = extractXtrackyLeadId(externalId);
+  if (xtrackyLeadId) {
+    await pushXtracky({
+      orderId: String(data.transaction_id),
+      amount: amountCents,
+      status: 'waiting_payment',
+      utm_source: xtrackyLeadId,
+      platform: 'FlevoPay',
+      leadName: payer.name || 'Cliente',
+      leadEmail: payer.email,
+      leadPhone: onlyDigits(payer.phone) || undefined,
+      leadDocument: onlyDigits(payer.cpf) || undefined,
+      currency: 'BRL',
+    });
+  }
 
   res.status(200).json({
     invoiceId: data.transaction_id,
