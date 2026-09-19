@@ -196,6 +196,7 @@ module.exports = async (req, res) => {
     const pixels = [
       { pixelId: process.env.TIKTOK_PIXEL_ID, accessToken: process.env.TIKTOK_ACCESS_TOKEN },
       { pixelId: process.env.TIKTOK_PIXEL_ID_2, accessToken: process.env.TIKTOK_ACCESS_TOKEN_2 },
+      { pixelId: process.env.TIKTOK_PIXEL_ID_3, accessToken: process.env.TIKTOK_ACCESS_TOKEN_3 },
     ];
     for (const { pixelId, accessToken } of pixels) {
       await pushTikTokPurchase({
